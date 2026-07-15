@@ -2,12 +2,16 @@
 
 /* ⚠️⚠️⚠️ 請替換成你自己的 Firebase 專案設定(見 README.md)⚠️⚠️⚠️
    還沒填之前會以「本機試玩模式」執行(資料只存在這台裝置的瀏覽器)。 */
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "YOUR_DATABASE_URL",
-  projectId: "YOUR_PROJECT",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyBfr1OAi2cQw2tXmebTD1dcH3SdWa6D93c",
+  authDomain: "feedingdodo-a1fd8.firebaseapp.com",
+  databaseURL: "https://feedingdodo-a1fd8-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "feedingdodo-a1fd8",
+  storageBucket: "feedingdodo-a1fd8.firebasestorage.app",
+  messagingSenderId: "323759958446",
+  appId: "1:323759958446:web:1b92149ad60af00e3c803f",
+  measurementId: "G-2FYQ7BF2Z6"
 };
 
 const isConfigured = !firebaseConfig.apiKey.startsWith("YOUR_");
