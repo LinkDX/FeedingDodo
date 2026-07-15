@@ -1,0 +1,323 @@
+/* ===== 逗逗貓吃什麼 — 可愛粉彩風 ===== */
+:root {
+  --bg: #fff6ec;
+  --card: #ffffff;
+  --primary: #ff9db0;
+  --primary-dark: #f27b93;
+  --accent: #ffd166;
+  --mint: #a8e6cf;
+  --text: #5b4636;
+  --text-light: #8a7160;
+  --border: #ffe3cf;
+  --shadow: 0 6px 18px rgba(242, 123, 147, .14);
+  --radius: 22px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  background-image:
+    radial-gradient(#ffe3cf 12%, transparent 13%),
+    radial-gradient(#ffe3cf 12%, transparent 13%);
+  background-size: 46px 46px;
+  background-position: 0 0, 23px 23px;
+  color: var(--text);
+  font-family: "Yuanti TC", "MS Gothic", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 16px 14px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ===== 本機模式橫幅 ===== */
+.local-banner {
+  background: #fff3cd;
+  color: #7a5c00;
+  font-size: 13px;
+  padding: 8px 12px;
+  text-align: center;
+  border-bottom: 2px dashed #ffd166;
+}
+
+/* ===== 頂部 ===== */
+.header { text-align: center; padding-top: 8px; }
+
+.cat { position: relative; display: inline-block; }
+.cat-face { width: 110px; margin: 0 auto; animation: float 3.2s ease-in-out infinite; }
+.cat-face svg { width: 100%; height: auto; display: block; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.cat.happy .cat-face { animation: bounce .55s ease; }
+@keyframes bounce {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.12) rotate(-4deg); }
+  60% { transform: scale(.96) rotate(3deg); }
+}
+
+.cat-bubble {
+  position: absolute;
+  top: -6px;
+  left: 92px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 14px 14px 14px 4px;
+  padding: 7px 12px;
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+
+h1 { font-size: 30px; margin-top: 4px; letter-spacing: 2px; }
+.subtitle { color: var(--text-light); font-size: 15px; margin-top: 2px; }
+
+/* ===== 卡片 ===== */
+.card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 16px;
+}
+
+h2 { font-size: 19px; margin-bottom: 10px; }
+h2.inline { display: inline; }
+.count { color: var(--text-light); font-size: 15px; font-weight: normal; }
+
+/* ===== 今日結果卡片 ===== */
+.result-card { text-align: center; }
+
+.btn-draw {
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none;
+  border-radius: 999px;
+  padding: 18px 52px;
+  cursor: pointer;
+  box-shadow: 0 8px 0 #d95f79, var(--shadow);
+  transition: transform .1s, box-shadow .1s;
+}
+.btn-draw:active { transform: translateY(6px); box-shadow: 0 2px 0 #d95f79; }
+.btn-draw { margin-bottom: 10px; }
+#draw-hint { margin-top: 16px; }
+.btn-draw:disabled { opacity: .6; cursor: wait; }
+
+.pick-label { font-size: 18px; color: var(--primary-dark); font-weight: bold; }
+
+.pick-name {
+  font-size: 34px;
+  font-weight: bold;
+  margin: 12px 0 16px;
+  word-break: break-word;
+}
+.pick-name.rolling { color: var(--text-light); }
+
+.pick-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.btn-order {
+  font-size: 19px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(135deg, #6fcf97, #4cb27a);
+  border-radius: 999px;
+  padding: 12px 28px;
+  text-decoration: none;
+  box-shadow: 0 5px 0 #3d9465;
+  transition: transform .1s, box-shadow .1s;
+}
+.btn-order:active { transform: translateY(4px); box-shadow: 0 1px 0 #3d9465; }
+
+.btn-redraw, .btn-share {
+  font-family: inherit;
+  font-size: 17px;
+  color: var(--primary-dark);
+  background: #fff0f3;
+  border: 2px solid var(--primary);
+  border-radius: 999px;
+  padding: 10px 22px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-redraw:hover, .btn-share:hover { background: #ffe4ea; }
+.btn-redraw:disabled { opacity: .6; cursor: wait; }
+
+/* ===== 店家清單 ===== */
+.list { list-style: none; }
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 4px;
+  border-bottom: 1.5px dashed var(--border);
+  font-size: 17px;
+}
+.list li:last-child { border-bottom: none; }
+
+.list .name { flex: 1; word-break: break-word; }
+.list .name.used { color: var(--text-light); text-decoration: line-through; }
+
+.tag-used {
+  font-size: 13px;
+  color: var(--text-light);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.link-icon { text-decoration: none; font-size: 17px; }
+
+.btn-del {
+  font-family: inherit;
+  background: none;
+  border: none;
+  font-size: 17px;
+  cursor: pointer;
+  opacity: .55;
+  padding: 4px;
+}
+.btn-del:hover { opacity: 1; }
+
+.add-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+.add-form input {
+  font-family: inherit;
+  font-size: 17px;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.add-form input:focus { border-color: var(--primary); }
+
+.btn-add {
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(135deg, #ffb56b, #ff9d4d);
+  border: none;
+  border-radius: 14px;
+  padding: 11px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #e5813a;
+  transition: transform .1s, box-shadow .1s;
+}
+.btn-add:active { transform: translateY(3px); box-shadow: 0 1px 0 #e5813a; }
+
+/* ===== 本週已抽 chips ===== */
+.chip-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.chip {
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--mint);
+  border: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: transform .12s;
+}
+.chip:hover { transform: scale(1.06); }
+
+/* ===== 歷史紀錄 ===== */
+details summary { cursor: pointer; list-style: none; }
+details summary::before { content: "▸ "; color: var(--primary-dark); }
+details[open] summary::before { content: "▾ "; }
+
+.history-list { list-style: none; margin-top: 10px; }
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 4px;
+  font-size: 16px;
+  border-bottom: 1.5px dashed var(--border);
+}
+.history-list li:last-child { border-bottom: none; }
+.history-list .date { color: var(--text-light); white-space: nowrap; }
+.history-list a { color: var(--primary-dark); }
+
+/* ===== 隱藏管理介面 ===== */
+.cat { cursor: pointer; user-select: none; -webkit-user-select: none; }
+
+.admin-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(91, 70, 54, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 20;
+}
+
+.admin-panel {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 18px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.admin-list { list-style: none; margin-top: 12px; }
+
+.admin-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1.5px dashed var(--border);
+}
+.admin-list li:last-child { border-bottom: none; }
+
+.admin-room { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-room code { font-size: 15px; word-break: break-all; }
+.admin-room .hint { margin-top: 0; }
+
+.admin-close { display: block; margin: 16px auto 0; }
+
+/* ===== 其他 ===== */
+.hint { font-size: 14px; color: var(--text-light); margin-top: 8px; }
+.footer { text-align: center; margin-top: 4px; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  background: rgba(91, 70, 54, .92);
+  color: #fff;
+  font-size: 16px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  z-index: 10;
+  animation: toast-in .2s ease;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
