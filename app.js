@@ -342,8 +342,9 @@ function guessNameFromPath(raw) {
 }
 
 // 第二層:透過公開代理抓頁面標題(盡力而為)
-// Uber Eats 的 app 分享連結(/store-browse-uuid/…)網址不含店名,且擋一般代理,
-// 用 r.jina.ai(讀取器代理,能繞過反機器人)為主,allorigins 為備援。
+// Uber Eats 的 app 分享連結(/store-browse-uuid/…)網址不含店名且擋一般代理,
+// 只有 r.jina.ai(無頭瀏覽器讀取器)繞得過,但首次要跑好幾秒。
+// 策略:三路代理「並行競速」取最先回來的有效店名 + 查過的連結存快取。
 async function fetchWithTimeout(url, ms) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -351,32 +352,62 @@ async function fetchWithTimeout(url, ms) {
   finally { clearTimeout(t); }
 }
 
+// 過濾代理被擋時回傳的垃圾標題(驗證頁、錯誤頁)
+const BAD_TITLE = /(verify|denied|not found|404|403|challenge|robot|just a moment|error|access)/i;
+function titleToName(t) {
+  const name = cleanTitle(t);
+  if (!name || BAD_TITLE.test(name)) return null;
+  if (/^(uber\s?eats?|foodpanda|uber)$/i.test(name)) return null; // 只剩平台名 = 沒抓到
+  return name;
+}
+
+async function viaJina(target) {
+  const res = await fetchWithTimeout("https://r.jina.ai/" + target, 12000);
+  const m = (await res.text()).match(/^Title:\s*(.+)$/m);
+  return m ? titleToName(m[1]) : null;
+}
+
+async function viaAllOrigins(target) {
+  const res = await fetchWithTimeout(
+    "https://api.allorigins.win/get?url=" + encodeURIComponent(target), 8000);
+  const m = ((await res.json()).contents || "").match(/<title[^>]*>([^<]+)<\/title>/i);
+  return m ? titleToName(m[1]) : null;
+}
+
+async function viaCorsProxy(target) {
+  const res = await fetchWithTimeout(
+    "https://corsproxy.io/?url=" + encodeURIComponent(target), 8000);
+  const m = (await res.text()).match(/<title[^>]*>([^<]+)<\/title>/i);
+  return m ? titleToName(m[1]) : null;
+}
+
+// 回傳最先解出有效店名的那一路;全部失敗回 null
+function firstNonNull(promises) {
+  return new Promise((resolve) => {
+    let pending = promises.length;
+    const done = (v) => { if (v) resolve(v); else if (--pending === 0) resolve(null); };
+    for (const p of promises) p.then(done, () => done(null));
+  });
+}
+
 async function guessNameFromTitle(raw) {
   const target = normalizeUrl(raw);
+  return firstNonNull([viaJina(target), viaAllOrigins(target), viaCorsProxy(target)]);
+}
 
-  // 1) r.jina.ai:回傳純文字,第一行是「Title: …」
+/* 查過的連結 → 店名 快取(最多留 100 筆) */
+function nameCacheGet(url) {
+  try { return JSON.parse(localStorage.getItem("feedingdodo:nameCache") || "{}")[url] || null; }
+  catch { return null; }
+}
+function nameCacheSet(url, name) {
   try {
-    const res = await fetchWithTimeout("https://r.jina.ai/" + target, 10000);
-    const m = (await res.text()).match(/^Title:\s*(.+)$/m);
-    if (m) {
-      const name = cleanTitle(m[1]);
-      if (name) return name;
-    }
+    const cache = JSON.parse(localStorage.getItem("feedingdodo:nameCache") || "{}");
+    cache[url] = name;
+    const keys = Object.keys(cache);
+    if (keys.length > 100) keys.slice(0, keys.length - 100).forEach((k) => delete cache[k]);
+    localStorage.setItem("feedingdodo:nameCache", JSON.stringify(cache));
   } catch {}
-
-  // 2) allorigins:抓原始頁面的 <title>
-  try {
-    const res = await fetchWithTimeout(
-      "https://api.allorigins.win/get?url=" + encodeURIComponent(target), 6000);
-    const j = await res.json();
-    const m = (j.contents || "").match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (m) {
-      const name = cleanTitle(m[1]);
-      if (name) return name;
-    }
-  } catch {}
-
-  return null;
 }
 
 async function autofillName(cat) {
@@ -384,6 +415,7 @@ async function autofillName(cat) {
   const url = c.addUrl.value.trim();
   if (!url || c.addName.value.trim()) return; // 沒連結或已手動填名字就不動
 
+  // 1) 從網址路徑解析(瞬間)
   const fromPath = guessNameFromPath(url);
   if (fromPath) {
     c.addName.value = fromPath;
@@ -391,12 +423,28 @@ async function autofillName(cat) {
     return;
   }
 
+  // 2) 查過的連結直接用快取(瞬間)
+  const cached = nameCacheGet(url);
+  if (cached) {
+    c.addName.value = cached;
+    toast("已自動帶入店名,可自行修改 ✏️");
+    return;
+  }
+
+  // 3) 三路代理競速
+  if (c.lookingUp === url) return; // 同一條連結已在查了
+  c.lookingUp = url;
   c.addName.placeholder = "🔍 正在找店名…";
   const fromTitle = await guessNameFromTitle(url);
+  if (c.lookingUp === url) c.lookingUp = null;
   c.addName.placeholder = "店名(貼連結可自動帶入)";
-  if (fromTitle && !c.addName.value.trim()) {
-    c.addName.value = fromTitle;
-    toast("已自動帶入店名,可自行修改 ✏️");
+  if (fromTitle) {
+    nameCacheSet(url, fromTitle);
+    // 使用者可能已經自己打了名字或換了連結,不要蓋掉
+    if (!c.addName.value.trim() && c.addUrl.value.trim() === url) {
+      c.addName.value = fromTitle;
+      toast("已自動帶入店名,可自行修改 ✏️");
+    }
   }
 }
 
@@ -587,9 +635,13 @@ function bindEvents() {
       toast(`已加入「${name}」${CATS[cat].emoji}`);
     });
 
-    // 貼上/填完連結後自動找店名
+    // 貼上/輸入連結後立刻開始找店名(input 加 500ms 防抖,涵蓋各種貼上方式)
     c.addUrl.addEventListener("change", () => autofillName(cat));
     c.addUrl.addEventListener("paste", () => setTimeout(() => autofillName(cat), 50));
+    c.addUrl.addEventListener("input", () => {
+      clearTimeout(c.inputTimer);
+      c.inputTimer = setTimeout(() => autofillName(cat), 500);
+    });
   }
 
   document.body.addEventListener("click", (e) => {
