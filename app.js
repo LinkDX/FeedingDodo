@@ -16,6 +16,13 @@ const firebaseConfig = {
 
 const isConfigured = !firebaseConfig.apiKey.startsWith("YOUR_");
 
+/* ===== 分類:吃的 / 喝的 ===== */
+
+const CATS = {
+  food:  { emoji: "🍱", label: "吃的", verb: "吃" },
+  drink: { emoji: "🧋", label: "喝的", verb: "喝" },
+};
+
 /* ===== 台北時間日期工具 ===== */
 
 // 今天日期(Asia/Taipei),格式 YYYY-MM-DD
@@ -39,8 +46,10 @@ function mondayKey() {
 /* ===== 儲存後端(Firebase / 本機)=====
    介面:
      watch(cb)          — 資料變動時以整個 room 物件呼叫 cb
-     write(updates)     — 多路徑更新,如 { "usedThisWeek/abc": true, "todayPick": {...} }
+     write(updates)     — 多路徑更新,如 { "food/usedThisWeek/abc": true }
      newId()            — 產生一個新的唯一 id
+     listRooms()        — 列出所有房間
+     deleteRoom(id)     — 刪除房間
 */
 
 function makeLocalBackend(roomId) {
@@ -99,7 +108,7 @@ async function makeFirebaseBackend(roomId) {
   return {
     watch(fn) { onValue(roomRef, (snap) => fn(snap.val() || {})); },
     async write(updates) { await update(roomRef, updates); },
-    newId() { return push(child(roomRef, "restaurants")).key; },
+    newId() { return push(child(roomRef, "x")).key; },
     async listRooms() {
       const snap = await get(ref(db, "rooms"));
       return snap.val() || {};
@@ -129,24 +138,42 @@ const $ = (id) => document.getElementById(id);
 const el = {
   localBanner: $("local-banner"),
   cat: $("cat"), catFace: $("cat-face"), catBubble: $("cat-bubble"),
-  drawArea: $("draw-area"), btnDraw: $("btn-draw"), drawHint: $("draw-hint"),
-  pickArea: $("pick-area"), pickName: $("pick-name"),
-  btnOrder: $("btn-order"), btnRedraw: $("btn-redraw"),
-  emptyArea: $("empty-area"), btnResetWeek: $("btn-reset-week"),
-  restaurantList: $("restaurant-list"), restaurantCount: $("restaurant-count"),
-  listEmptyHint: $("list-empty-hint"),
-  addForm: $("add-form"), addName: $("add-name"), addUrl: $("add-url"),
-  usedCard: $("used-card"), usedList: $("used-list"),
-  adminOverlay: $("admin-overlay"), adminList: $("admin-list"),
-  adminEmpty: $("admin-empty"), btnAdminClose: $("btn-admin-close"),
   historyList: $("history-list"), historyEmptyHint: $("history-empty-hint"),
   btnShare: $("btn-share"),
+  adminOverlay: $("admin-overlay"), adminList: $("admin-list"),
+  adminEmpty: $("admin-empty"), btnAdminClose: $("btn-admin-close"),
   toast: $("toast"),
 };
 
+// 每個分類各自的一組元素(結果格 + 清單卡)
+const catEl = {};
+for (const cat of Object.keys(CATS)) {
+  const slot = document.querySelector(`.result-slot[data-cat="${cat}"]`);
+  const card = document.querySelector(`.list-card[data-cat="${cat}"]`);
+  catEl[cat] = {
+    drawArea: slot.querySelector(".draw-area"),
+    btnDraw: slot.querySelector(".btn-draw"),
+    drawHint: slot.querySelector(".draw-hint"),
+    pickArea: slot.querySelector(".pick-area"),
+    pickName: slot.querySelector(".pick-name"),
+    btnOrder: slot.querySelector(".btn-order"),
+    btnRedraw: slot.querySelector(".pick-area .btn-redraw"),
+    emptyArea: slot.querySelector(".empty-area"),
+    btnResetWeek: slot.querySelector(".btn-reset-week"),
+    list: card.querySelector(".list"),
+    count: card.querySelector(".count"),
+    listEmptyHint: card.querySelector(".list-empty-hint"),
+    usedBlock: card.querySelector(".used-block"),
+    usedList: card.querySelector(".used-list"),
+    addForm: card.querySelector(".add-form"),
+    addName: card.querySelector(".add-name"),
+    addUrl: card.querySelector(".add-url"),
+  };
+}
+
 let backend = null;
-let state = {};       // 目前 room 資料
-let rolling = false;  // 抽選動畫進行中
+let state = {};                          // 目前 room 資料
+const rolling = { food: false, drink: false }; // 抽選動畫進行中
 
 /* ===== 小工具 ===== */
 
@@ -174,18 +201,42 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-/* ===== 資料存取 ===== */
+function normalizeUrl(raw) {
+  const url = (raw || "").trim();
+  if (!url) return "";
+  return /^https?:\/\//i.test(url) ? url : "https://" + url;
+}
 
-const restaurants = () => state.restaurants || {};
-const usedThisWeek = () => state.usedThisWeek || {};
-const candidates = () =>
-  Object.keys(restaurants()).filter((id) => !usedThisWeek()[id]);
+/* ===== 資料存取(依分類)===== */
 
-function validTodayPick() {
-  const p = state.todayPick;
+const catData = (cat) => state[cat] || {};
+const restaurants = (cat) => catData(cat).restaurants || {};
+const usedThisWeek = (cat) => catData(cat).usedThisWeek || {};
+const candidates = (cat) =>
+  Object.keys(restaurants(cat)).filter((id) => !usedThisWeek(cat)[id]);
+
+function validTodayPick(cat) {
+  const p = catData(cat).todayPick;
   if (!p || p.date !== todayKey()) return null;
-  const r = restaurants()[p.restaurantId];
+  const r = restaurants(cat)[p.restaurantId];
   return r ? { id: p.restaurantId, ...r } : null;
+}
+
+/* ===== 舊資料遷移(單一清單 → food)===== */
+
+function maybeMigrateLegacy() {
+  if (!state.restaurants) return false;
+  const updates = {
+    "food/restaurants": state.restaurants,
+    restaurants: null, usedThisWeek: null, todayPick: null,
+  };
+  if (state.usedThisWeek) updates["food/usedThisWeek"] = state.usedThisWeek;
+  if (state.todayPick) updates["food/todayPick"] = state.todayPick;
+  for (const [date, h] of Object.entries(state.history || {})) {
+    if (h && h.name) updates[`history/${date}`] = { food: { name: h.name, url: h.url || "" } };
+  }
+  backend.write(updates);
+  return true; // 等下一次 watch 回呼再渲染
 }
 
 /* ===== 每週 lazy reset ===== */
@@ -193,109 +244,183 @@ function validTodayPick() {
 function maybeResetWeek() {
   const wk = mondayKey();
   if (state.weekKey !== wk) {
-    backend.write({ weekKey: wk, usedThisWeek: null });
-    return true; // 已觸發重置,等下一次 watch 回呼
+    backend.write({ weekKey: wk, "food/usedThisWeek": null, "drink/usedThisWeek": null });
+    return true;
   }
   return false;
 }
 
 /* ===== 抽選 ===== */
 
-function drawRestaurant() {
-  if (rolling) return;
-  if (maybeResetWeek()) { setTimeout(drawRestaurant, 150); return; }
+function drawRestaurant(cat) {
+  if (rolling[cat]) return;
+  if (maybeResetWeek()) { setTimeout(() => drawRestaurant(cat), 150); return; }
 
-  const pool = candidates();
+  const c = catEl[cat];
+  const pool = candidates(cat);
   if (pool.length === 0) {
     // 今天已抽中但本週名單也用完 → 引導清空重抽
-    el.pickArea.hidden = true;
-    el.drawArea.hidden = true;
-    el.emptyArea.hidden = false;
-    setCat("normal", "全部吃過一輪了喵…");
+    c.pickArea.hidden = true;
+    c.drawArea.hidden = true;
+    c.emptyArea.hidden = false;
+    setCat("normal", `${CATS[cat].label}全部${CATS[cat].verb}過一輪了喵…`);
     return;
   }
 
-  rolling = true;
-  el.btnDraw.disabled = true;
-  el.btnRedraw.disabled = true;
+  rolling[cat] = true;
+  c.btnDraw.disabled = true;
+  c.btnRedraw.disabled = true;
   setCat("normal", "抽選中…🥁");
 
   const chosenId = pool[Math.floor(Math.random() * pool.length)];
 
   // 轉盤動畫:快速跳店名後定格
-  el.drawArea.hidden = true;
-  el.emptyArea.hidden = true;
-  el.pickArea.hidden = false;
-  el.btnOrder.hidden = true;
-  el.pickName.classList.add("rolling");
+  c.drawArea.hidden = true;
+  c.emptyArea.hidden = true;
+  c.pickArea.hidden = false;
+  c.btnOrder.hidden = true;
+  c.pickName.classList.add("rolling");
 
-  const names = pool.map((id) => restaurants()[id].name);
+  const names = pool.map((id) => restaurants(cat)[id].name);
   let tick = 0;
   const timer = setInterval(() => {
-    el.pickName.textContent = names[tick % names.length];
+    c.pickName.textContent = names[tick % names.length];
     tick++;
   }, 90);
 
   setTimeout(async () => {
     clearInterval(timer);
-    el.pickName.classList.remove("rolling");
-    rolling = false;
-    el.btnDraw.disabled = false;
-    el.btnRedraw.disabled = false;
+    c.pickName.classList.remove("rolling");
+    rolling[cat] = false;
+    c.btnDraw.disabled = false;
+    c.btnRedraw.disabled = false;
 
-    const r = restaurants()[chosenId];
+    const r = restaurants(cat)[chosenId];
     if (!r) { render(); return; } // 店家在動畫期間被刪除
     await backend.write({
-      [`usedThisWeek/${chosenId}`]: true,
-      todayPick: { date: todayKey(), restaurantId: chosenId },
-      [`history/${todayKey()}`]: { name: r.name, url: r.url || "" },
+      [`${cat}/usedThisWeek/${chosenId}`]: true,
+      [`${cat}/todayPick`]: { date: todayKey(), restaurantId: chosenId },
+      [`history/${todayKey()}/${cat}`]: { name: r.name, url: r.url || "" },
     });
-    setCat("happy", "就吃這家喵!🎉");
+    setCat("happy", `就${CATS[cat].verb}這家喵!🎉`);
   }, 1200);
+}
+
+/* ===== 自動從連結找店名 ===== */
+
+function cleanSlug(s) {
+  try { s = decodeURIComponent(s); } catch {}
+  return s.replace(/-/g, " ").trim().slice(0, 40);
+}
+
+function cleanTitle(t) {
+  return t
+    .split(/[|｜]/)[0]
+    .replace(/(外送|外賣|菜單|線上訂|網路訂|Order Online|Delivery|Menu).*$/i, "")
+    .trim()
+    .slice(0, 40);
+}
+
+// 第一層:從網址路徑直接解析(Uber Eats / foodpanda 的 slug 通常就是店名,零網路請求)
+function guessNameFromPath(raw) {
+  try {
+    const url = new URL(normalizeUrl(raw));
+    let m;
+    if (url.hostname.includes("ubereats")) {
+      m = url.pathname.match(/\/store\/([^/]+)/);
+      if (m) return cleanSlug(m[1]);
+    }
+    if (url.hostname.includes("foodpanda")) {
+      m = url.pathname.match(/\/restaurant\/[^/]+\/([^/]+)/);
+      if (m) return cleanSlug(m[1]);
+    }
+  } catch {}
+  return null;
+}
+
+// 第二層:透過公開 CORS 代理抓頁面標題(盡力而為,6 秒逾時)
+async function guessNameFromTitle(raw) {
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(
+      "https://api.allorigins.win/get?url=" + encodeURIComponent(normalizeUrl(raw)),
+      { signal: ctrl.signal }
+    );
+    const j = await res.json();
+    const m = (j.contents || "").match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (m) {
+      const name = cleanTitle(m[1]);
+      if (name) return name;
+    }
+  } catch {}
+  return null;
+}
+
+async function autofillName(cat) {
+  const c = catEl[cat];
+  const url = c.addUrl.value.trim();
+  if (!url || c.addName.value.trim()) return; // 沒連結或已手動填名字就不動
+
+  const fromPath = guessNameFromPath(url);
+  if (fromPath) {
+    c.addName.value = fromPath;
+    toast("已自動帶入店名,可自行修改 ✏️");
+    return;
+  }
+
+  c.addName.placeholder = "🔍 正在找店名…";
+  const fromTitle = await guessNameFromTitle(url);
+  c.addName.placeholder = "店名(貼連結可自動帶入)";
+  if (fromTitle && !c.addName.value.trim()) {
+    c.addName.value = fromTitle;
+    toast("已自動帶入店名,可自行修改 ✏️");
+  }
 }
 
 /* ===== 畫面 ===== */
 
-function render() {
-  if (rolling) return; // 動畫中不重畫結果卡
+function renderSlot(cat) {
+  if (rolling[cat]) return; // 動畫中不重畫結果格
 
-  const all = restaurants();
-  const ids = Object.keys(all);
-  const used = usedThisWeek();
-  const pick = validTodayPick();
-  const pool = candidates();
+  const c = catEl[cat];
+  const ids = Object.keys(restaurants(cat));
+  const pool = candidates(cat);
+  const pick = validTodayPick(cat);
 
-  // --- 今日結果卡片 ---
-  el.drawArea.hidden = true;
-  el.pickArea.hidden = true;
-  el.emptyArea.hidden = true;
+  c.drawArea.hidden = true;
+  c.pickArea.hidden = true;
+  c.emptyArea.hidden = true;
 
   if (pick) {
-    el.pickArea.hidden = false;
-    el.pickName.textContent = pick.name;
+    c.pickArea.hidden = false;
+    c.pickName.textContent = pick.name;
     if (pick.url) {
-      el.btnOrder.href = pick.url;
-      el.btnOrder.hidden = false;
+      c.btnOrder.href = pick.url;
+      c.btnOrder.hidden = false;
     } else {
-      el.btnOrder.hidden = true;
+      c.btnOrder.hidden = true;
     }
-    setCat("happy", "今天吃這家喵!😋");
   } else if (ids.length > 0 && pool.length === 0) {
-    el.emptyArea.hidden = false;
-    setCat("normal", "全部吃過一輪了喵…");
+    c.emptyArea.hidden = false;
   } else {
-    el.drawArea.hidden = false;
-    el.drawHint.textContent = ids.length === 0
-      ? "先在下面加幾家店吧!"
+    c.drawArea.hidden = false;
+    c.drawHint.textContent = ids.length === 0
+      ? `先在下面加幾家${CATS[cat].label}的店吧!`
       : `本週還有 ${pool.length} 家可以抽`;
-    el.btnDraw.disabled = ids.length === 0;
-    setCat("normal", "今天吃什麼呢?");
+    c.btnDraw.disabled = ids.length === 0;
   }
+}
 
-  // --- 店家清單 ---
-  el.restaurantCount.textContent = ids.length ? `(${ids.length} 家)` : "";
-  el.listEmptyHint.hidden = ids.length !== 0;
-  el.restaurantList.innerHTML = ids
+function renderList(cat) {
+  const c = catEl[cat];
+  const all = restaurants(cat);
+  const ids = Object.keys(all);
+  const used = usedThisWeek(cat);
+
+  c.count.textContent = ids.length ? `(${ids.length} 家)` : "";
+  c.listEmptyHint.hidden = ids.length !== 0;
+  c.list.innerHTML = ids
     .map((id) => {
       const r = all[id];
       const link = r.url
@@ -305,31 +430,54 @@ function render() {
       return `<li>
         <span class="name ${used[id] ? "used" : ""}">${escapeHtml(r.name)}</span>
         ${usedTag}${link}
-        <button class="btn-del" data-del="${id}" title="刪除">🗑️</button>
+        <button class="btn-del" data-del="${id}" data-cat="${cat}" title="刪除">🗑️</button>
       </li>`;
     })
     .join("");
 
-  // --- 本週已抽 ---
   const usedIds = Object.keys(used).filter((id) => all[id]);
-  el.usedCard.hidden = usedIds.length === 0;
-  el.usedList.innerHTML = usedIds
-    .map((id) => `<li><button class="chip" data-unuse="${id}">${escapeHtml(all[id].name)} ✕</button></li>`)
+  c.usedBlock.hidden = usedIds.length === 0;
+  c.usedList.innerHTML = usedIds
+    .map((id) => `<li><button class="chip" data-unuse="${id}" data-cat="${cat}">${escapeHtml(all[id].name)} ✕</button></li>`)
     .join("");
+}
 
-  // --- 歷史紀錄 ---
+function renderHistory() {
   const history = state.history || {};
   const dates = Object.keys(history).sort().reverse();
   el.historyEmptyHint.hidden = dates.length !== 0;
   el.historyList.innerHTML = dates
     .map((d) => {
-      const h = history[d];
-      const name = h.url
-        ? `<a href="${escapeHtml(h.url)}" target="_blank" rel="noopener">${escapeHtml(h.name)}</a>`
-        : escapeHtml(h.name);
-      return `<li><span class="date">${d}</span><span>${name}</span></li>`;
+      const items = Object.keys(CATS)
+        .filter((cat) => history[d]?.[cat]?.name)
+        .map((cat) => {
+          const h = history[d][cat];
+          const name = h.url
+            ? `<a href="${escapeHtml(h.url)}" target="_blank" rel="noopener">${escapeHtml(h.name)}</a>`
+            : escapeHtml(h.name);
+          return `${CATS[cat].emoji} ${name}`;
+        })
+        .join("<span class='dot'>・</span>");
+      return items ? `<li><span class="date">${d}</span><span class="hist-items">${items}</span></li>` : "";
     })
     .join("");
+}
+
+function render() {
+  for (const cat of Object.keys(CATS)) {
+    renderSlot(cat);
+    renderList(cat);
+  }
+  renderHistory();
+
+  // 逗逗貓心情:兩樣都抽好了最開心
+  if (Object.keys(CATS).every((cat) => rolling[cat])) return;
+  const foodPick = validTodayPick("food");
+  const drinkPick = validTodayPick("drink");
+  if (foodPick && drinkPick) setCat("happy", "吃的喝的都搞定喵!😋");
+  else if (foodPick) setCat("happy", "再抽個喝的吧?🧋");
+  else if (drinkPick) setCat("happy", "再抽個吃的吧?🍱");
+  else setCat("normal", "今天吃什麼呢?");
 }
 
 /* ===== 隱藏管理介面(連點貓咪 5 次)===== */
@@ -350,9 +498,10 @@ async function openAdmin() {
   el.adminEmpty.hidden = entries.length !== 0;
   el.adminList.innerHTML = entries
     .map(([id, room]) => {
-      const count = Object.keys(room.restaurants || {}).length;
+      const nFood = Object.keys(room.food?.restaurants || room.restaurants || {}).length;
+      const nDrink = Object.keys(room.drink?.restaurants || {}).length;
       const lastDate = Object.keys(room.history || {}).sort().pop();
-      const meta = `${count} 家店${lastDate ? `・最近抽選 ${lastDate}` : ""}`;
+      const meta = `🍱${nFood}・🧋${nDrink}${lastDate ? `・最近 ${lastDate}` : ""}`;
       const action = id === currentRoomId
         ? `<span class="tag-used">目前所在</span>`
         : `<button class="chip" data-goto="${escapeHtml(id)}">進入</button>
@@ -394,43 +543,52 @@ function bindAdmin() {
 /* ===== 事件 ===== */
 
 function bindEvents() {
-  el.btnDraw.addEventListener("click", drawRestaurant);
-  el.btnRedraw.addEventListener("click", drawRestaurant);
+  for (const cat of Object.keys(CATS)) {
+    const c = catEl[cat];
+    c.btnDraw.addEventListener("click", () => drawRestaurant(cat));
+    c.btnRedraw.addEventListener("click", () => drawRestaurant(cat));
 
-  el.btnResetWeek.addEventListener("click", () => {
-    backend.write({ usedThisWeek: null, todayPick: null });
-    toast("已清空本週紀錄 🧹");
-  });
+    c.btnResetWeek.addEventListener("click", () => {
+      backend.write({ [`${cat}/usedThisWeek`]: null, [`${cat}/todayPick`]: null });
+      toast(`已清空${CATS[cat].label}的本週紀錄 🧹`);
+    });
 
-  el.addForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = el.addName.value.trim();
-    if (!name) return;
-    let url = el.addUrl.value.trim();
-    if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
-    backend.write({ [`restaurants/${backend.newId()}`]: { name, url } });
-    el.addName.value = "";
-    el.addUrl.value = "";
-    el.addName.focus();
-    toast(`已加入「${name}」🍽️`);
-  });
+    c.addForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = c.addName.value.trim();
+      if (!name) { c.addName.focus(); return; }
+      const url = normalizeUrl(c.addUrl.value);
+      backend.write({ [`${cat}/restaurants/${backend.newId()}`]: { name, url } });
+      c.addName.value = "";
+      c.addUrl.value = "";
+      c.addName.focus();
+      toast(`已加入「${name}」${CATS[cat].emoji}`);
+    });
+
+    // 貼上/填完連結後自動找店名
+    c.addUrl.addEventListener("change", () => autofillName(cat));
+    c.addUrl.addEventListener("paste", () => setTimeout(() => autofillName(cat), 50));
+  }
 
   document.body.addEventListener("click", (e) => {
     const del = e.target.closest("[data-del]");
     if (del) {
-      const id = del.dataset.del;
-      const name = restaurants()[id]?.name || "";
+      const { del: id, cat } = del.dataset;
+      const name = restaurants(cat)[id]?.name || "";
       if (confirm(`確定刪除「${name}」?`)) {
-        const updates = { [`restaurants/${id}`]: null, [`usedThisWeek/${id}`]: null };
-        if (state.todayPick?.restaurantId === id) updates.todayPick = null;
+        const updates = {
+          [`${cat}/restaurants/${id}`]: null,
+          [`${cat}/usedThisWeek/${id}`]: null,
+        };
+        if (catData(cat).todayPick?.restaurantId === id) updates[`${cat}/todayPick`] = null;
         backend.write(updates);
       }
     }
     const unuse = e.target.closest("[data-unuse]");
     if (unuse) {
-      const id = unuse.dataset.unuse;
-      const updates = { [`usedThisWeek/${id}`]: null };
-      if (state.todayPick?.restaurantId === id) updates.todayPick = null;
+      const { unuse: id, cat } = unuse.dataset;
+      const updates = { [`${cat}/usedThisWeek/${id}`]: null };
+      if (catData(cat).todayPick?.restaurantId === id) updates[`${cat}/todayPick`] = null;
       backend.write(updates);
       toast("已放回本週候選 ↩️");
     }
@@ -463,6 +621,7 @@ async function main() {
   bindAdmin();
   backend.watch((data) => {
     state = data || {};
+    if (maybeMigrateLegacy()) return; // 遷移後等下一次回呼
     maybeResetWeek();
     render();
   });

@@ -59,43 +59,81 @@
       <p class="subtitle">餵飽逗逗貓的每日抽選 🐾</p>
     </header>
 
-    <!-- 今日結果卡片 -->
-    <section class="card result-card" id="result-card">
-      <div id="draw-area">
-        <button class="btn-draw" id="btn-draw">🎲 抽選!</button>
-        <p class="hint" id="draw-hint"></p>
-      </div>
-      <div id="pick-area" hidden>
-        <p class="pick-label">🎉 今天就吃這家 🎉</p>
-        <p class="pick-name" id="pick-name"></p>
-        <div class="pick-actions">
-          <a class="btn-order" id="btn-order" target="_blank" rel="noopener" hidden>🛵 去點餐</a>
-          <button class="btn-redraw" id="btn-redraw">🔄 重抽</button>
+    <!-- 今日結果卡片:吃的 / 喝的 兩格 -->
+    <section class="card result-card">
+      <div class="result-slot" data-cat="food">
+        <p class="slot-head">🍱 吃的</p>
+        <div class="draw-area">
+          <button class="btn-draw">🎲 抽吃的!</button>
+          <p class="hint draw-hint"></p>
+        </div>
+        <div class="pick-area" hidden>
+          <p class="pick-label">🎉 今天吃這家 🎉</p>
+          <p class="pick-name"></p>
+          <div class="pick-actions">
+            <a class="btn-order" target="_blank" rel="noopener" hidden>🛵 去點餐</a>
+            <button class="btn-redraw">🔄 重抽</button>
+          </div>
+        </div>
+        <div class="empty-area" hidden>
+          <p class="pick-label">😿 本週都吃過一輪了!</p>
+          <button class="btn-redraw btn-reset-week">🧹 清空本週紀錄重抽</button>
         </div>
       </div>
-      <div id="empty-area" hidden>
-        <p class="pick-label">😿 本週都吃過一輪了!</p>
-        <button class="btn-redraw" id="btn-reset-week">🧹 清空本週紀錄重抽</button>
+
+      <hr class="slot-divider">
+
+      <div class="result-slot" data-cat="drink">
+        <p class="slot-head">🧋 喝的</p>
+        <div class="draw-area">
+          <button class="btn-draw">🎲 抽喝的!</button>
+          <p class="hint draw-hint"></p>
+        </div>
+        <div class="pick-area" hidden>
+          <p class="pick-label">🎉 今天喝這家 🎉</p>
+          <p class="pick-name"></p>
+          <div class="pick-actions">
+            <a class="btn-order" target="_blank" rel="noopener" hidden>🛵 去點餐</a>
+            <button class="btn-redraw">🔄 重抽</button>
+          </div>
+        </div>
+        <div class="empty-area" hidden>
+          <p class="pick-label">😿 本週都喝過一輪了!</p>
+          <button class="btn-redraw btn-reset-week">🧹 清空本週紀錄重抽</button>
+        </div>
       </div>
     </section>
 
-    <!-- 店家清單 -->
-    <section class="card">
-      <h2>🍱 店家清單 <span class="count" id="restaurant-count"></span></h2>
-      <ul class="list" id="restaurant-list"></ul>
-      <p class="hint" id="list-empty-hint" hidden>還沒有店家,先加幾家吧!</p>
-      <form class="add-form" id="add-form">
-        <input type="text" id="add-name" placeholder="店名(必填)" maxlength="40" required>
-        <input type="text" inputmode="url" id="add-url" placeholder="訂餐連結,如 Uber Eats(選填)">
+    <!-- 吃的清單 -->
+    <section class="card list-card" data-cat="food">
+      <h2>🍱 吃的清單 <span class="count"></span></h2>
+      <ul class="list"></ul>
+      <p class="hint list-empty-hint" hidden>還沒有店家,先加幾家吧!</p>
+      <div class="used-block" hidden>
+        <p class="hint">本週已抽(點一下放回候選):</p>
+        <ul class="chip-list used-list"></ul>
+      </div>
+      <form class="add-form">
+        <input type="text" class="add-name" placeholder="店名(貼連結可自動帶入)" maxlength="40">
+        <input type="text" inputmode="url" class="add-url" placeholder="訂餐連結,如 Uber Eats(選填)">
         <button type="submit" class="btn-add">➕ 新增店家</button>
       </form>
     </section>
 
-    <!-- 本週已抽 -->
-    <section class="card" id="used-card" hidden>
-      <h2>📅 本週已抽</h2>
-      <p class="hint">點一下可以把店家放回本週候選</p>
-      <ul class="chip-list" id="used-list"></ul>
+    <!-- 喝的清單 -->
+    <section class="card list-card" data-cat="drink">
+      <h2>🧋 喝的清單 <span class="count"></span></h2>
+      <ul class="list"></ul>
+      <p class="hint list-empty-hint" hidden>還沒有店家,先加幾家吧!</p>
+      <div class="used-block" hidden>
+        <p class="hint">本週已抽(點一下放回候選):</p>
+        <ul class="chip-list used-list"></ul>
+      </div>
+      <form class="add-form">
+        <input type="text" class="add-name" placeholder="店名(貼連結可自動帶入)" maxlength="40">
+        <input type="text" inputmode="url" class="add-url" placeholder="訂餐連結,如 Uber Eats(選填)">
+        <button type="submit" class="btn-add">➕ 新增店家</button>
+      </form>
     </section>
 
     <!-- 歷史紀錄 -->

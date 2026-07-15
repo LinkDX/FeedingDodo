@@ -94,8 +94,22 @@ h2 { font-size: 19px; margin-bottom: 10px; }
 h2.inline { display: inline; }
 .count { color: var(--text-light); font-size: 15px; font-weight: normal; }
 
-/* ===== 今日結果卡片 ===== */
+/* ===== 今日結果卡片(吃的/喝的兩格)===== */
 .result-card { text-align: center; }
+
+.slot-head {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-light);
+  text-align: left;
+  margin-bottom: 10px;
+}
+
+.slot-divider {
+  border: none;
+  border-top: 2px dashed var(--border);
+  margin: 16px 0;
+}
 
 .btn-draw {
   font-family: inherit;
@@ -112,7 +126,7 @@ h2.inline { display: inline; }
 }
 .btn-draw:active { transform: translateY(6px); box-shadow: 0 2px 0 #d95f79; }
 .btn-draw { margin-bottom: 10px; }
-#draw-hint { margin-top: 16px; }
+.draw-hint { margin-top: 16px; }
 .btn-draw:disabled { opacity: .6; cursor: wait; }
 
 .pick-label { font-size: 18px; color: var(--primary-dark); font-weight: bold; }
@@ -255,6 +269,11 @@ details[open] summary::before { content: "▾ "; }
 .history-list li:last-child { border-bottom: none; }
 .history-list .date { color: var(--text-light); white-space: nowrap; }
 .history-list a { color: var(--primary-dark); }
+.history-list .hist-items { text-align: right; word-break: break-word; }
+.history-list .dot { color: var(--text-light); }
+
+/* ===== 清單卡的本週已抽區塊 ===== */
+.used-block { margin-top: 10px; }
 
 /* ===== 隱藏管理介面 ===== */
 .cat { cursor: pointer; user-select: none; -webkit-user-select: none; }
