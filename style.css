@@ -259,6 +259,8 @@ details[open] summary::before { content: "▾ "; }
 /* ===== 隱藏管理介面 ===== */
 .cat { cursor: pointer; user-select: none; -webkit-user-select: none; }
 
+.admin-overlay[hidden] { display: none; }
+
 .admin-overlay {
   position: fixed;
   inset: 0;
