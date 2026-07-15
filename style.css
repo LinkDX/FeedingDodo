@@ -195,7 +195,7 @@ h2.inline { display: inline; }
 
 .link-icon { text-decoration: none; font-size: 17px; }
 
-.btn-del {
+.btn-del, .btn-mark {
   font-family: inherit;
   background: none;
   border: none;
@@ -204,7 +204,7 @@ h2.inline { display: inline; }
   opacity: .55;
   padding: 4px;
 }
-.btn-del:hover { opacity: 1; }
+.btn-del:hover, .btn-mark:hover { opacity: 1; }
 
 .add-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 

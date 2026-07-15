@@ -497,9 +497,12 @@ function renderList(cat) {
         ? `<a class="link-icon" href="${escapeHtml(r.url)}" target="_blank" rel="noopener" title="訂餐連結">🔗</a>`
         : "";
       const usedTag = used[id] ? `<span class="tag-used">本週已抽</span>` : "";
+      const markBtn = used[id]
+        ? ""
+        : `<button class="btn-mark" data-markused="${id}" data-cat="${cat}" title="設為本週已抽(不用抽的)">☑️</button>`;
       return `<li>
         <span class="name ${used[id] ? "used" : ""}">${escapeHtml(r.name)}</span>
-        ${usedTag}${link}
+        ${usedTag}${link}${markBtn}
         <button class="btn-del" data-del="${id}" data-cat="${cat}" title="刪除">🗑️</button>
       </li>`;
     })
@@ -657,6 +660,12 @@ function bindEvents() {
         if (catData(cat).todayPick?.restaurantId === id) updates[`${cat}/todayPick`] = null;
         backend.write(updates);
       }
+    }
+    const mark = e.target.closest("[data-markused]");
+    if (mark) {
+      const { markused: id, cat } = mark.dataset;
+      backend.write({ [`${cat}/usedThisWeek/${id}`]: true });
+      toast(`「${restaurants(cat)[id]?.name || ""}」已列入本週已抽 ☑️`);
     }
     const unuse = e.target.closest("[data-unuse]");
     if (unuse) {
