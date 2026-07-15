@@ -316,7 +316,10 @@ function cleanSlug(s) {
 function cleanTitle(t) {
   return t
     .split(/[|｜]/)[0]
-    .replace(/(外送|外賣|菜單|線上訂|網路訂|Order Online|Delivery|Menu).*$/i, "")
+    .replace(/【[^】]*】/g, " ")
+    .replace(/^\s*(Order|訂購)\s+/i, "")
+    .replace(/\s*(外送|外賣|菜單|線上訂|網路訂|Menu Delivery|Order Online|Delivery|Menu|Prices).*$/i, "")
+    .replace(/\s+/g, " ")
     .trim()
     .slice(0, 40);
 }
@@ -338,15 +341,33 @@ function guessNameFromPath(raw) {
   return null;
 }
 
-// 第二層:透過公開 CORS 代理抓頁面標題(盡力而為,6 秒逾時)
+// 第二層:透過公開代理抓頁面標題(盡力而為)
+// Uber Eats 的 app 分享連結(/store-browse-uuid/…)網址不含店名,且擋一般代理,
+// 用 r.jina.ai(讀取器代理,能繞過反機器人)為主,allorigins 為備援。
+async function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 async function guessNameFromTitle(raw) {
+  const target = normalizeUrl(raw);
+
+  // 1) r.jina.ai:回傳純文字,第一行是「Title: …」
   try {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 6000);
-    const res = await fetch(
-      "https://api.allorigins.win/get?url=" + encodeURIComponent(normalizeUrl(raw)),
-      { signal: ctrl.signal }
-    );
+    const res = await fetchWithTimeout("https://r.jina.ai/" + target, 10000);
+    const m = (await res.text()).match(/^Title:\s*(.+)$/m);
+    if (m) {
+      const name = cleanTitle(m[1]);
+      if (name) return name;
+    }
+  } catch {}
+
+  // 2) allorigins:抓原始頁面的 <title>
+  try {
+    const res = await fetchWithTimeout(
+      "https://api.allorigins.win/get?url=" + encodeURIComponent(target), 6000);
     const j = await res.json();
     const m = (j.contents || "").match(/<title[^>]*>([^<]+)<\/title>/i);
     if (m) {
@@ -354,6 +375,7 @@ async function guessNameFromTitle(raw) {
       if (name) return name;
     }
   } catch {}
+
   return null;
 }
 
