@@ -44,8 +44,8 @@
 ### 2. 部署到 GitHub Pages
 
 1. 在 GitHub 建一個 repo(例如 `FeedingDodo`),把這個資料夾的檔案 push 上去
-2. Repo → Settings → Pages → Source 選 `Deploy from a branch`,Branch 選 `main` / `/ (root)` → Save
-3. 等一兩分鐘,網頁就會出現在 `https://<你的帳號>.github.io/FeedingDodo/`
+2. Repo → Settings → Pages → Source 選 `GitHub Actions`
+3. 每次 push 到 `main`,[.github/workflows/deploy.yml](.github/workflows/deploy.yml) 會自動部署,網頁在 `https://<你的帳號>.github.io/FeedingDodo/`
 
 ### 3. 開始使用
 
